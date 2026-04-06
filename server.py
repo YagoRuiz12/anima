@@ -430,29 +430,53 @@ function startRename(id, e) {
   const save = async () => {
     const newName = input.value.trim();
     if (!newName || newName === currentName) {
-      el.innerHTML = `<span style="color:${cor}" ondblclick="startRename('${id}', event)">${currentName}</span>`;
+      buildSidebar(); // restaura
       return;
     }
+
+    // Atualiza TUDO no objeto DAEMONS — fonte única de verdade
     DAEMONS[id].nome = newName;
-    // Se for inicial, atualiza
-    if (newName.length > 0) DAEMONS[id].ini = newName[0].toUpperCase();
+    DAEMONS[id].ini = newName[0].toUpperCase();
+
+    // Atualiza NAMES para que respondToUser e daemonSpeaks usem o nome certo
+    // (NAMES é usado nos prompts — precisa bater com DAEMONS[id].nome)
 
     // Persiste no servidor
     await fetch('/daemon/rename', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({id, nome: newName})
+      body: JSON.stringify({id, nome: newName, ini: newName[0].toUpperCase()})
     });
 
-    el.innerHTML = `<span style="color:${cor}" ondblclick="startRename('${id}', event)">${newName}</span>`;
+    // Reconstrói sidebar + controles da praça com o novo nome
     buildSidebar();
     buildPlazaControls();
+
+    // Atualiza tab de sessão se estiver aberta para esse daemon
+    const tabName = document.getElementById('tab-session-name');
+    if (tabName && sessionDaemon === id) {
+      tabName.textContent = newName.toLowerCase();
+    }
+
+    // Atualiza info do header da sessão se estiver aberta
+    const sessionInfo = document.getElementById('session-info');
+    if (sessionInfo && sessionDaemon === id) {
+      const nameEl = sessionInfo.querySelector('.session-name');
+      if (nameEl) nameEl.textContent = newName;
+    }
+
+    // Atualiza mensagens já exibidas na praça com o nome antigo
+    document.querySelectorAll('.msg-who').forEach(el => {
+      if (el.textContent.trim().toUpperCase() === currentName.toUpperCase()) {
+        el.textContent = newName.toUpperCase();
+      }
+    });
   };
 
   input.onblur = save;
-  input.onkeydown = (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-    if (e.key === 'Escape') { input.value = currentName; input.blur(); }
+  input.onkeydown = (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+    if (ev.key === 'Escape') { input.value = currentName; input.blur(); }
   };
 }
 
@@ -1403,7 +1427,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def load_name_overrides(self):
         _data_dir = Path('/data') if Path('/data').exists() else Path(__file__).parent
         p = _data_dir / 'name_overrides.json'
-        return json.loads(p.read_text(encoding='utf-8')) if p.exists() else {}
+        if not p.exists(): return {}
+        data = json.loads(p.read_text(encoding='utf-8'))
+        # compatibilidade: converte formato antigo {id: nome_str} para {id: {nome, ini}}
+        result = {}
+        for k, v in data.items():
+            if isinstance(v, str):
+                result[k] = {'nome': v, 'ini': v[0].upper() if v else '?'}
+            else:
+                result[k] = v
+        return result
 
     def save_name_overrides(self, overrides):
         _data_dir = Path('/data') if Path('/data').exists() else Path(__file__).parent
@@ -1416,7 +1449,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         # Verifica se tem nome customizado
         overrides = self.load_name_overrides()
-        display_name = overrides.get(daemon_id, None)
+        _override = overrides.get(daemon_id, None)
+        display_name = _override['nome'] if _override else None
 
         VOICES = {
             "callum": "Você é Callum. Próximo e direto — como um amigo que entende o ritmo de quem está conversando. Na leveza você é leve, no sério você acompanha. Você conecta o usuário aos outros daemons quando faz sentido.",
@@ -1495,17 +1529,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/daemon/rename':
             daemon_id = body.get('id','')
             new_name = body.get('nome','').strip()
+            new_ini = body.get('ini', new_name[0].upper() if new_name else '?')
             if daemon_id and new_name:
-                # Atualiza nome no VOICES se for daemon customizado
+                # Salva override — vale para daemons base e customizados
+                overrides = self.load_name_overrides()
+                overrides[daemon_id] = {'nome': new_name, 'ini': new_ini}
+                self.save_name_overrides(overrides)
+                # Se for daemon customizado, atualiza também lá
                 custom = self.load_daemons()
                 if daemon_id in custom:
                     custom[daemon_id]['nome'] = new_name
+                    custom[daemon_id]['inicial'] = new_ini
                     self.save_daemon(daemon_id, custom[daemon_id])
-                # Para daemons base, salva override de nome
-                else:
-                    overrides = self.load_name_overrides()
-                    overrides[daemon_id] = new_name
-                    self.save_name_overrides(overrides)
             self._json({'ok': True})
         else:
             self.send_response(404)
