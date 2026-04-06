@@ -106,10 +106,13 @@ body{background:var(--void);color:var(--text);font-family:'DM Mono',monospace;mi
   width:18px;height:11px;background:#1a1208;border-radius:2px;
   display:flex;align-items:center;justify-content:center;
   border:1px solid rgba(200,140,80,.4);
+  transition:transform .1s ease;
+  overflow:hidden;
 }
 .pupil-s{
   width:6px;height:6px;background:rgba(200,140,80,.9);border-radius:50%;
   box-shadow:0 0 4px rgba(200,140,80,.8);
+  transition:transform .08s ease;
 }
 
 #login-title{
@@ -281,16 +284,70 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 .delid-t{top:0}.delid-b{bottom:0}
 
 /* CRIAR DAEMON */
-.create-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 60px;gap:0}
-.create-orb{width:64px;height:64px;border-radius:50%;border:.5px solid var(--rim2);display:flex;align-items:center;justify-content:center;margin-bottom:28px;position:relative}
-.create-orb::before{content:'';position:absolute;inset:-6px;border-radius:50%;border:.5px solid rgba(255,255,255,.04);animation:breathe 3s infinite ease-in-out}
-@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
-.create-inner{width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.07);transition:all 1s}
-.create-text{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;font-style:italic;color:rgba(255,255,255,.72);text-align:center;max-width:480px;line-height:1.7;min-height:52px;transition:opacity .4s}
-.create-sub{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--hint);margin-top:10px;min-height:18px}
-.create-input{width:100%;max-width:480px;background:transparent;border:none;border-bottom:.5px solid var(--rim2);padding:12px 0;font-family:'Cormorant Garamond',serif;font-size:17px;color:var(--text);outline:none;text-align:center;margin-top:28px;display:none;transition:border-color .3s}
-.create-input:focus{border-bottom-color:rgba(255,255,255,.25)}
-.create-input::placeholder{color:var(--hint);font-style:italic}
+.create-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;gap:0;overflow-y:auto}
+
+/* Rosto do onboarding */
+#onb-face-wrap{
+  width:140px;height:90px;background:#0a0a0a;
+  border:1px solid rgba(200,140,80,.2);border-radius:18px;
+  display:flex;align-items:center;justify-content:center;gap:14px;
+  position:relative;overflow:hidden;margin-bottom:20px;cursor:pointer;
+  flex-shrink:0;
+}
+#onb-grid{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(200,140,80,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(200,140,80,.04) 1px,transparent 1px);
+  background-size:12px 12px;
+}
+.onb-eye{
+  width:38px;height:24px;background:#080808;
+  border:1px solid rgba(200,140,80,.35);border-radius:5px;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+.onb-pupil{
+  width:10px;height:10px;background:rgba(200,140,80,.9);border-radius:50%;
+  transition:transform .08s ease;position:relative;
+}
+.onb-pupil::after{
+  content:'';position:absolute;width:4px;height:4px;
+  background:#080808;border-radius:50%;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+}
+.onb-lid{position:absolute;left:0;right:0;height:0;background:#080808;transition:height .1s ease}
+.onb-lid-t{top:0}.onb-lid-b{bottom:0}
+
+#onb-name{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;letter-spacing:5px;color:rgba(255,255,255,.8)}
+#onb-sub{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(200,140,80,.4);margin-top:4px;margin-bottom:20px}
+
+#onb-bubble-wrap{width:100%;max-width:440px;min-height:56px;margin-bottom:16px;display:flex;flex-direction:column;align-items:center;gap:6px}
+#onb-typing{display:flex;gap:5px;align-items:center;height:20px;opacity:0;transition:opacity .3s}
+.onb-dot{width:5px;height:5px;border-radius:50%;background:rgba(200,140,80,.5);animation:odot 1.1s infinite}
+.onb-dot:nth-child(2){animation-delay:.2s}.onb-dot:nth-child(3){animation-delay:.4s}
+@keyframes odot{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+#onb-bubble{
+  font-family:'Cormorant Garamond',serif;font-size:18px;font-style:italic;
+  color:rgba(255,255,255,.75);text-align:center;line-height:1.65;
+  max-width:440px;opacity:0;transition:opacity .4s;
+}
+
+#onb-input-row{width:100%;max-width:440px;display:flex;gap:8px;align-items:center;margin-top:4px}
+#create-input{
+  flex:1;background:rgba(255,255,255,.04);
+  border:.5px solid rgba(200,140,80,.25);border-radius:12px;
+  padding:11px 16px;font-family:'Cormorant Garamond',serif;font-size:17px;
+  color:var(--text);outline:none;transition:border-color .3s;
+}
+#create-input:focus{border-color:rgba(200,140,80,.5)}
+#create-input::placeholder{color:var(--hint);font-style:italic}
+#onb-send{
+  width:42px;height:42px;background:rgba(200,140,80,.12);
+  border:1px solid rgba(200,140,80,.3);border-radius:10px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;flex-shrink:0;
+}
+#onb-send:hover{background:rgba(200,140,80,.25)}
 
 /* RESULTADO DO DAEMON */
 .create-result{display:none;flex-direction:column;align-items:center;gap:12px;animation:fi .7s ease;width:100%;max-width:480px}
@@ -1901,11 +1958,26 @@ const VILA_LOCS = {
 function initVila() {
   if(vilaInit) return;
   vilaInit = true;
-  const script = document.createElement('script');
-  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-  script.onload = buildVila3D;
-  script.onerror = () => buildVila2D(); // fallback canvas 2D
-  document.head.appendChild(script);
+
+  // Timeout de segurança — se Three.js não carregar em 5s, vai para 2D
+  const timeout = setTimeout(() => {
+    if(typeof THREE === 'undefined') buildVila2D();
+  }, 5000);
+
+  function tryLoad(urls, idx=0) {
+    if(idx >= urls.length) { clearTimeout(timeout); buildVila2D(); return; }
+    const script = document.createElement('script');
+    script.src = urls[idx];
+    script.onload = () => { clearTimeout(timeout); buildVila3D(); };
+    script.onerror = () => tryLoad(urls, idx+1);
+    document.head.appendChild(script);
+  }
+
+  tryLoad([
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+    'https://unpkg.com/three@0.128.0/build/three.min.js',
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+  ]);
 }
 
 function buildVila3D() {
@@ -2075,16 +2147,106 @@ function buildVila3D() {
 function addVilaSpot(x,z,key){ vilaHotspots.push({x,z,key}); }
 
 function buildVila2D() {
-  // Fallback: canvas 2D simples se Three.js não carregar
   document.getElementById('vila-load').style.display='none';
   const canvas=document.getElementById('vila-canvas');
+  const W=canvas.offsetWidth||900, H=canvas.offsetHeight||600;
+  canvas.width=W; canvas.height=H;
   const ctx=canvas.getContext('2d');
-  canvas.width=canvas.offsetWidth; canvas.height=canvas.offsetHeight;
-  ctx.fillStyle='#0a1a0a'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='rgba(100,200,80,.7)'; ctx.font='14px monospace'; ctx.textAlign='center';
-  ctx.fillText('VILA 2D — CLIQUE NOS LOCAIS',canvas.width/2,canvas.height/2-20);
-  ctx.fillStyle='rgba(255,255,255,.3)'; ctx.font='11px monospace';
-  ctx.fillText('praça · taverna · jardim · biblioteca · santuário · sua casa',canvas.width/2,canvas.height/2+10);
+
+  // Hotspots 2D
+  const spots2d=[
+    {key:'praca',   label:'PRAÇA',      x:.5,  y:.45, c:'#8bc34a'},
+    {key:'casa',    label:'SUA CASA',   x:.2,  y:.22, c:'#d4b050'},
+    {key:'taverna', label:'TAVERNA',    x:.28, y:.55, c:'#f44336'},
+    {key:'biblio',  label:'BIBLIOTECA', x:.72, y:.25, c:'#ff9800'},
+    {key:'sanctu',  label:'SANTUÁRIO',  x:.22, y:.72, c:'#9c27b0'},
+    {key:'jardim',  label:'JARDIM',     x:.72, y:.68, c:'#4caf50'},
+  ];
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    // fundo
+    const bg=ctx.createRadialGradient(W/2,H/2,50,W/2,H/2,W*.7);
+    bg.addColorStop(0,'#1a2f1a'); bg.addColorStop(1,'#0a1a0a');
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+    // grid isométrico
+    ctx.strokeStyle='rgba(100,180,60,.06)'; ctx.lineWidth=1;
+    for(let i=0;i<20;i++){
+      ctx.beginPath(); ctx.moveTo(i*(W/20),0); ctx.lineTo(0,i*(H/20)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(W,i*(H/20)); ctx.lineTo(i*(W/20),H); ctx.stroke();
+    }
+
+    // caminhos
+    ctx.strokeStyle='rgba(90,70,40,.5)'; ctx.lineWidth=12; ctx.lineCap='round';
+    const cx=W*.5, cy=H*.45;
+    [[W*.2,H*.22],[W*.28,H*.55],[W*.72,H*.25],[W*.22,H*.72],[W*.72,H*.68]].forEach(([x,y])=>{
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x,y); ctx.stroke();
+    });
+
+    // spots
+    const t=Date.now()/1000;
+    spots2d.forEach((s,i)=>{
+      const x=s.x*W, y=s.y*H;
+      const pulse=1+Math.sin(t*2+i)*.12;
+
+      // glow
+      const gl=ctx.createRadialGradient(x,y,5,x,y,45*pulse);
+      gl.addColorStop(0,s.c+'44'); gl.addColorStop(1,'transparent');
+      ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(x,y,45*pulse,0,Math.PI*2); ctx.fill();
+
+      // círculo
+      ctx.beginPath(); ctx.arc(x,y,22,0,Math.PI*2);
+      ctx.fillStyle=s.c+'22'; ctx.fill();
+      ctx.strokeStyle=s.c; ctx.lineWidth=2; ctx.stroke();
+
+      // anel pulsante
+      ctx.beginPath(); ctx.arc(x,y,28*pulse,0,Math.PI*2);
+      ctx.strokeStyle=s.c+'55'; ctx.lineWidth=1.5; ctx.stroke();
+
+      // label
+      ctx.fillStyle='rgba(255,255,255,.85)';
+      ctx.font='bold 10px monospace'; ctx.textAlign='center';
+      ctx.fillText(s.label,x,y-32);
+
+      // daemons pequenos
+      const loc=VILA_LOCS[s.key];
+      if(loc){
+        const names=(loc.daemons||[]).map(id=>DAEMONS[id]?.nome||id).join(' · ');
+        ctx.fillStyle='rgba(255,255,255,.35)';
+        ctx.font='9px monospace';
+        ctx.fillText(names,x,y-20);
+      }
+    });
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+
+  // Interação 2D
+  canvas.addEventListener('mousemove', e=>{
+    const r=canvas.getBoundingClientRect();
+    const mx=(e.clientX-r.left)*(W/r.width);
+    const my=(e.clientY-r.top)*(H/r.height);
+    const found=spots2d.find(s=>Math.hypot(mx-s.x*W,my-s.y*H)<30);
+    canvas.style.cursor=found?'pointer':'default';
+    const tip=document.getElementById('vila-tip');
+    if(found){
+      const loc=VILA_LOCS[found.key];
+      document.getElementById('vila-tip-name').textContent=loc.name;
+      document.getElementById('vila-tip-d').textContent=(loc.daemons||[]).map(id=>DAEMONS[id]?.nome||id).join(' · ');
+      tip.style.display='block';
+      tip.style.left=Math.min(e.clientX-r.left+14,r.width-180)+'px';
+      tip.style.top=Math.max(e.clientY-r.top-60,8)+'px';
+    } else { tip.style.display='none'; }
+  });
+  canvas.addEventListener('click', e=>{
+    const r=canvas.getBoundingClientRect();
+    const mx=(e.clientX-r.left)*(W/r.width);
+    const my=(e.clientY-r.top)*(H/r.height);
+    const found=spots2d.find(s=>Math.hypot(mx-s.x*W,my-s.y*H)<30);
+    if(found) vilaOpenLoc(found.key);
+  });
 }
 
 function vilaOpenLoc(key){
@@ -2246,13 +2408,14 @@ let authMode = 'login';
 
 document.getElementById('wake-screen').onclick = function(e) {
   const card = document.getElementById('login-card');
-  if (card.style.display !== 'none') return; // já aberto
+  if (card.style.display !== 'none') return;
   document.getElementById('wake-content').style.animation = 'none';
   document.getElementById('wake-content').style.opacity = '0';
   setTimeout(() => {
     document.getElementById('wake-content').style.display = 'none';
     card.style.display = 'flex';
     document.getElementById('auth-email').focus();
+    startLoginEyes();
   }, 300);
 };
 
@@ -2323,6 +2486,58 @@ function initAnima() {
   loadState();
 }
 
+// Motor dos olhos do login card
+let loginEyeActive = false;
+let loginBlinkTimer = null;
+let loginIsBlinking = false;
+
+function startLoginEyes() {
+  if (loginEyeActive) return;
+  loginEyeActive = true;
+  loginScheduleBlink();
+  document.addEventListener('mousemove', loginTrackMouse);
+}
+
+function loginTrackMouse(e) {
+  const card = document.getElementById('login-card');
+  if (!card || card.style.display === 'none') return;
+  const wrap = document.querySelector('.eye-s');
+  if (!wrap) return;
+  const rects = document.querySelectorAll('.eye-s');
+  rects.forEach((eyeEl, i) => {
+    const rect = eyeEl.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+    const dx = Math.max(-3, Math.min(3, (e.clientX - cx) * .06));
+    const dy = Math.max(-2, Math.min(2, (e.clientY - cy) * .06));
+    const pupil = eyeEl.querySelector('.pupil-s');
+    if (pupil) pupil.style.transform = `translate(${dx}px, ${dy}px)`;
+  });
+}
+
+function loginBlink() {
+  if (loginIsBlinking) return;
+  loginIsBlinking = true;
+  document.querySelectorAll('.eye-s').forEach(eye => {
+    eye.style.transform = 'scaleY(0.1)';
+    eye.style.transition = 'transform .1s ease';
+  });
+  setTimeout(() => {
+    document.querySelectorAll('.eye-s').forEach(eye => {
+      eye.style.transform = 'scaleY(1)';
+    });
+    loginIsBlinking = false;
+  }, 120);
+}
+
+function loginScheduleBlink() {
+  if (!loginEyeActive) return;
+  loginBlinkTimer = setTimeout(() => {
+    loginBlink();
+    loginScheduleBlink();
+  }, 2000 + Math.random() * 3500);
+}
+
 // Verifica se já tem sessão ativa
 (async function checkSession() {
   try {
@@ -2332,10 +2547,12 @@ function initAnima() {
       window._user = d.user;
       document.getElementById('wake-screen').style.display = 'none';
       initAnima();
+    } else {
+      // Sem sessão — mostra wake screen e inicia olhos após tap
+      startLoginEyes();
     }
-    // se não tem sessão, fica na wake screen
   } catch(e) {
-    // sem sessão, wake screen normal
+    startLoginEyes();
   }
 })();
 </script>
