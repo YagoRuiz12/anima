@@ -11,6 +11,7 @@ Uso:
 """
 
 import http.server, json, os, urllib.request, urllib.error
+import hashlib, secrets, time
 from pathlib import Path
 
 PORT = int(os.environ.get("PORT", 7070))
@@ -40,6 +41,117 @@ HTML = r"""<!DOCTYPE html>
   --text:rgba(255,255,255,0.88);--muted:rgba(255,255,255,0.42);--hint:rgba(255,255,255,0.2)
 }
 body{background:var(--void);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;overflow-x:hidden;font-size:15px}
+
+/* ── WAKE SCREEN ── */
+#wake-screen{
+  position:fixed;inset:0;z-index:1000;background:#000;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+}
+#wake-stars{position:absolute;inset:0;pointer-events:none}
+
+#wake-content{
+  display:flex;flex-direction:column;align-items:center;gap:32px;
+  animation:wake-pulse 3s ease-in-out infinite;
+}
+@keyframes wake-pulse{0%,100%{opacity:.6}50%{opacity:1}}
+
+#wake-logo{
+  width:80px;height:80px;background:#0a0a0a;
+  border:1px solid rgba(200,140,80,.3);border-radius:16px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 0 40px rgba(200,140,80,.08);
+}
+.eye{
+  width:22px;height:14px;background:#1a1208;border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid rgba(200,140,80,.4);
+  position:relative;overflow:hidden;
+}
+.pupil{
+  width:8px;height:8px;background:rgba(200,140,80,.9);border-radius:50%;
+  box-shadow:0 0 6px rgba(200,140,80,.8);
+  animation:blink 4s ease-in-out infinite;
+}
+@keyframes blink{
+  0%,45%,55%,100%{transform:scaleY(1);opacity:1}
+  50%{transform:scaleY(0.1);opacity:.5}
+}
+
+#wake-tap{
+  font-family:'DM Mono',monospace;
+  font-size:11px;letter-spacing:4px;
+  color:rgba(200,140,80,.6);
+  text-transform:uppercase;
+  animation:tap-blink 1.8s ease-in-out infinite;
+}
+@keyframes tap-blink{0%,100%{opacity:.4}50%{opacity:.9}}
+
+/* ── LOGIN CARD ── */
+#login-card{
+  position:absolute;
+  width:min(380px, 92vw);
+  background:#0d0d0d;
+  border:1px solid rgba(200,140,80,.2);
+  border-radius:20px;
+  padding:32px 28px;
+  display:flex;flex-direction:column;align-items:center;gap:20px;
+  box-shadow:0 20px 60px rgba(0,0,0,.8), 0 0 0 1px rgba(200,140,80,.05);
+  animation:card-in .5s cubic-bezier(.16,1,.3,1);
+}
+@keyframes card-in{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
+
+#login-logo-small{display:flex;gap:8px;align-items:center}
+.eye-s{
+  width:18px;height:11px;background:#1a1208;border-radius:2px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid rgba(200,140,80,.4);
+}
+.pupil-s{
+  width:6px;height:6px;background:rgba(200,140,80,.9);border-radius:50%;
+  box-shadow:0 0 4px rgba(200,140,80,.8);
+}
+
+#login-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:28px;font-weight:300;letter-spacing:6px;
+  color:rgba(255,255,255,.9);margin-top:-8px;
+}
+#login-sub{font-size:10px;letter-spacing:2px;color:rgba(200,140,80,.5);text-transform:uppercase;margin-top:-14px}
+
+#login-tabs{
+  display:flex;gap:0;width:100%;
+  border:.5px solid rgba(200,140,80,.2);border-radius:8px;overflow:hidden;
+}
+.ltab{
+  flex:1;padding:8px;text-align:center;
+  font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+  color:rgba(255,255,255,.35);cursor:pointer;transition:all .2s;
+}
+.ltab.active{background:rgba(200,140,80,.12);color:rgba(200,140,80,.9)}
+.ltab:hover:not(.active){color:rgba(255,255,255,.6)}
+
+#auth-form{display:flex;flex-direction:column;gap:10px;width:100%}
+.auth-input{
+  width:100%;background:rgba(255,255,255,.04);
+  border:.5px solid rgba(255,255,255,.1);border-radius:8px;
+  padding:12px 14px;font-family:'DM Mono',monospace;font-size:13px;
+  color:rgba(255,255,255,.85);outline:none;transition:border-color .2s;
+}
+.auth-input:focus{border-color:rgba(200,140,80,.4)}
+.auth-input::placeholder{color:rgba(255,255,255,.25)}
+
+#auth-error{font-size:11px;color:rgba(220,100,80,.8);text-align:center;min-height:14px}
+
+#auth-btn{
+  width:100%;background:rgba(200,140,80,.15);
+  border:1px solid rgba(200,140,80,.4);border-radius:8px;
+  padding:13px;font-family:'DM Mono',monospace;font-size:12px;
+  letter-spacing:2px;text-transform:uppercase;
+  color:rgba(200,140,80,.9);cursor:pointer;transition:all .2s;
+  margin-top:4px;
+}
+#auth-btn:hover{background:rgba(200,140,80,.25);border-color:rgba(200,140,80,.7)}
 canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 
 /* HEADER */
@@ -128,16 +240,45 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 
 /* SESSÃO */
 .session-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.session-daemon-info{padding:16px 24px;border-bottom:.5px solid var(--rim);display:flex;align-items:center;gap:14px}
-.session-av{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:20px}
+.session-daemon-info{padding:12px 20px;border-bottom:.5px solid var(--rim);display:flex;align-items:center;gap:14px}
 .session-name{font-size:14px;letter-spacing:1px;text-transform:uppercase}
 .session-ess{font-size:11px;color:var(--hint);margin-top:3px}
-.session-chat{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:12px}
+.session-chat{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
 .session-empty{display:flex;align-items:center;justify-content:center;flex:1;font-family:'Cormorant Garamond',serif;font-size:20px;font-style:italic;color:var(--hint)}
-.session-input-wrap{border-top:.5px solid var(--rim);padding:16px 24px;display:flex;gap:10px;align-items:center}
+.session-input-wrap{border-top:.5px solid var(--rim);padding:14px 20px;display:flex;gap:10px;align-items:center}
 #session-input{flex:1;background:var(--panel);border:.5px solid var(--rim2);border-radius:24px;padding:12px 20px;font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--text);outline:none;transition:border-color .2s}
 #session-input:focus{border-color:rgba(255,255,255,.25)}
 #session-input::placeholder{color:var(--hint);font-style:italic}
+
+/* ── DAEMON FACE ── */
+.daemon-face{
+  width:56px;height:56px;background:#0a0a0a;
+  border-radius:10px;display:flex;align-items:center;justify-content:center;gap:6px;
+  flex-shrink:0;position:relative;overflow:hidden;cursor:pointer;
+  border:1px solid rgba(255,255,255,.08);
+}
+.daemon-face .grid-bg{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
+  background-size:8px 8px;
+}
+.deye{
+  width:16px;height:10px;border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;flex-shrink:0;
+  border:1px solid;
+}
+.dpupil{
+  width:5px;height:5px;border-radius:50%;
+  transition:transform .08s ease;position:relative;
+}
+.dpupil::after{
+  content:'';position:absolute;width:2px;height:2px;
+  background:#0a0a0a;border-radius:50%;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+}
+.delid{position:absolute;left:0;right:0;height:0;background:#0a0a0a;transition:height .1s ease}
+.delid-t{top:0}.delid-b{bottom:0}
 
 /* CRIAR DAEMON */
 .create-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 60px;gap:0}
@@ -185,6 +326,8 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 .tl-label{font-size:9px;color:var(--muted);margin-bottom:2px}
 .tl-desc{font-family:'Cormorant Garamond',serif;font-size:12px;font-style:italic;color:rgba(255,255,255,.55);line-height:1.5}
 .lib-msg{font-family:'Cormorant Garamond',serif;font-size:16px;font-style:italic;color:rgba(255,255,255,.65);text-align:center;padding:12px;border:.5px solid var(--rim);border-radius:8px;margin-top:12px;display:none;animation:fi .5s ease}
+
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── MOBILE ── */
 @media (max-width: 768px) {
@@ -298,6 +441,49 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 </style>
 </head>
 <body>
+<!-- WAKE SCREEN -->
+<div id="wake-screen">
+  <canvas id="wake-stars"></canvas>
+  <div id="wake-content">
+    <div id="wake-logo">
+      <div id="wake-eyes">
+        <div class="eye" id="eye-left"><div class="pupil"></div></div>
+        <div class="eye" id="eye-right"><div class="pupil"></div></div>
+      </div>
+    </div>
+    <div id="wake-tap">TAP TO WAKE</div>
+  </div>
+
+  <!-- CARD DE LOGIN -->
+  <div id="login-card" style="display:none">
+    <div id="login-logo-small">
+      <div class="eye-s"><div class="pupil-s"></div></div>
+      <div class="eye-s"><div class="pupil-s"></div></div>
+    </div>
+    <div id="login-title">ANIMA</div>
+    <div id="login-sub">o mundo sempre existiu</div>
+
+    <div id="login-tabs">
+      <div class="ltab active" onclick="switchAuth('login')">entrar</div>
+      <div class="ltab" onclick="switchAuth('signup')">criar conta</div>
+    </div>
+
+    <div id="auth-form">
+      <div id="signup-name-wrap" style="display:none">
+        <input class="auth-input" id="auth-name" type="text" placeholder="seu nome"/>
+      </div>
+      <input class="auth-input" id="auth-email" type="email" placeholder="email"/>
+      <input class="auth-input" id="auth-pass" type="password" placeholder="senha"
+             onkeydown="if(event.key==='Enter')submitAuth()"/>
+      <div id="auth-error"></div>
+      <button id="auth-btn" onclick="submitAuth()">
+        <span id="auth-btn-text">entrar</span>
+        <span id="auth-loading" style="display:none">···</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <canvas id="stars"></canvas>
 
 <div class="hdr">
@@ -322,10 +508,35 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
   <!-- ÁREA PRINCIPAL -->
   <div class="area">
     <div class="tabs">
+      <div class="tab" onclick="setTab('vila')">vila ↗</div>
       <div class="tab active" onclick="setTab('plaza')">praça livre</div>
       <div class="tab" id="tab-session" onclick="setTab('session')" style="display:none">sessão — <span id="tab-session-name"></span></div>
       <div class="tab" onclick="setTab('create')">criar daemon</div>
       <div class="tab" onclick="setTab('absence')">ausência</div>
+    </div>
+
+    <!-- VILA 3D -->
+    <div id="view-vila" style="display:none;flex:1;position:relative;overflow:hidden;background:#0a1a0a">
+      <div id="vila-load" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1a0a;z-index:5;font-family:monospace;color:rgba(100,200,80,.7);letter-spacing:3px;font-size:11px;gap:12px">
+        <div style="width:36px;height:36px;border:2px solid rgba(100,200,80,.3);border-top-color:rgba(100,200,80,.8);border-radius:50%;animation:spin 1s linear infinite"></div>
+        ANIMA · VILA
+      </div>
+      <canvas id="vila-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+      <div id="vila-hud" style="position:absolute;top:12px;left:12px;z-index:10;background:rgba(5,15,5,.85);border:1px solid rgba(100,200,80,.35);border-radius:8px;padding:5px 12px;color:rgba(130,220,100,.9);font-size:10px;letter-spacing:3px;font-family:monospace">ANIMA · VILA</div>
+      <div id="vila-tip" style="position:absolute;z-index:10;pointer-events:none;display:none;background:rgba(5,12,5,.95);border:1px solid rgba(100,180,70,.4);border-radius:10px;padding:10px 16px;font-family:monospace">
+        <div id="vila-tip-name" style="font-size:13px;color:rgba(160,230,120,.9);letter-spacing:1px;margin-bottom:3px"></div>
+        <div id="vila-tip-d" style="font-size:10px;color:rgba(255,255,255,.45)"></div>
+      </div>
+      <div id="vila-ov" style="position:absolute;inset:0;z-index:20;background:#050d05;opacity:0;pointer-events:none;transition:opacity .35s"></div>
+      <!-- LOC PANEL -->
+      <div id="vila-pan" style="position:absolute;inset:0;z-index:15;background:#070e07;display:none;flex-direction:column;align-items:center;padding:20px;overflow-y:auto;font-family:monospace">
+        <div onclick="vilaBack()" style="position:absolute;top:14px;left:14px;background:rgba(80,160,60,.12);border:1px solid rgba(80,160,60,.3);border-radius:7px;padding:6px 14px;color:rgba(120,210,90,.8);font-size:10px;letter-spacing:1.5px;cursor:pointer">← voltar</div>
+        <div id="vila-pt" style="font-size:22px;letter-spacing:5px;color:rgba(220,240,200,.9);margin-top:8px"></div>
+        <div id="vila-ps" style="font-size:10px;color:rgba(80,160,60,.5);margin-bottom:4px;font-style:italic"></div>
+        <div id="vila-pd" style="font-size:10px;color:rgba(255,255,255,.2);margin-bottom:20px;letter-spacing:1px"></div>
+        <div id="vila-pf" style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-bottom:16px"></div>
+        <div id="vila-pe" style="max-width:400px;border:.5px solid rgba(80,160,60,.2);border-radius:10px;padding:12px;text-align:center;font-size:11px;color:rgba(80,160,60,.4);letter-spacing:1px;font-style:italic"></div>
+      </div>
     </div>
 
     <!-- PRAÇA -->
@@ -357,7 +568,22 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 
     <!-- SESSÃO -->
     <div class="session-wrap" id="view-session" style="display:none">
-      <div class="session-daemon-info" id="session-info"></div>
+      <div class="session-daemon-info" id="session-info">
+        <div class="daemon-face" id="session-face" onclick="sessionFaceClick()">
+          <div class="grid-bg"></div>
+          <div class="deye" id="sf-el">
+            <div class="delid delid-t" id="sf-ltl"></div>
+            <div class="dpupil" id="sf-pl"></div>
+            <div class="delid delid-b" id="sf-lbl"></div>
+          </div>
+          <div class="deye" id="sf-er">
+            <div class="delid delid-t" id="sf-ltr"></div>
+            <div class="dpupil" id="sf-pr"></div>
+            <div class="delid delid-b" id="sf-lbr"></div>
+          </div>
+        </div>
+        <div id="session-info-text"></div>
+      </div>
       <div class="session-chat" id="session-chat">
         <div class="session-empty" id="session-empty">o daemon aguarda</div>
       </div>
@@ -369,10 +595,41 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 
     <!-- CRIAR -->
     <div class="create-wrap" id="view-create" style="display:none">
-      <div class="create-orb"><div class="create-inner" id="create-inner"></div></div>
-      <div class="create-text" id="create-text">responda 5 perguntas. seu daemon emerge do que você disser.</div>
-      <div class="create-sub" id="create-sub">pressione enter para começar</div>
-      <input class="create-input" id="create-input" type="text" placeholder="escreva e pressione enter" onkeydown="if(event.key==='Enter')answerCreate()"/>
+
+      <!-- ROSTO NEUTRO DO ONBOARDING -->
+      <div id="onb-face-wrap">
+        <div id="onb-grid"></div>
+        <div class="onb-eye" id="onb-el">
+          <div class="onb-lid onb-lid-t" id="onb-ltl"></div>
+          <div class="onb-pupil" id="onb-pl"></div>
+          <div class="onb-lid onb-lid-b" id="onb-lbl"></div>
+        </div>
+        <div class="onb-eye" id="onb-er">
+          <div class="onb-lid onb-lid-t" id="onb-ltr"></div>
+          <div class="onb-pupil" id="onb-pr"></div>
+          <div class="onb-lid onb-lid-b" id="onb-lbr"></div>
+        </div>
+      </div>
+
+      <div id="onb-name">ANIMA</div>
+      <div id="onb-sub">presença em formação</div>
+
+      <!-- BOLHA DE FALA -->
+      <div id="onb-bubble-wrap">
+        <div id="onb-typing"><div class="onb-dot"></div><div class="onb-dot"></div><div class="onb-dot"></div></div>
+        <div id="onb-bubble"></div>
+      </div>
+
+      <!-- INPUT -->
+      <div id="onb-input-row" style="display:none">
+        <input id="create-input" type="text" placeholder="escreva e pressione enter"
+               onkeydown="if(event.key==='Enter')answerCreate()"/>
+        <button id="onb-send" onclick="answerCreate()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="rgba(200,140,80,.9)"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+        </button>
+      </div>
+
+      <!-- RESULTADO DO DAEMON -->
       <div class="create-result" id="create-result">
         <div class="result-av" id="result-av"></div>
         <div class="result-name" id="result-name"></div>
@@ -1079,15 +1336,98 @@ async function autoTurn() {
 }
 
 // ── SESSÃO PRIVADA ──
+// ── FACE ENGINE ──
+let faceActive = false;
+let faceBlinkTimer = null;
+let faceMX = 0, faceMY = 0;
+let faceRAF = null;
+let faceIsBlinking = false;
+let faceColor = '#c88c50';
+
+function faceInit(cor) {
+  faceColor = cor;
+  const el = document.getElementById('sf-el');
+  const er = document.getElementById('sf-er');
+  if (!el) return;
+  const c = cor.replace('.9','');
+  [el, er].forEach(e => {
+    e.style.borderColor = c.replace('rgba(','').replace(')','').split(',').slice(0,3).join(',');
+    e.style.borderColor = cor.replace('.9','.4');
+  });
+  ['sf-pl','sf-pr'].forEach(id => {
+    const p = document.getElementById(id);
+    if (p) p.style.background = cor.replace('.9','.9');
+  });
+  faceActive = true;
+  faceMovePupils();
+  faceScheduleBlink();
+}
+
+function faceStop() {
+  faceActive = false;
+  clearTimeout(faceBlinkTimer);
+  if (faceRAF) cancelAnimationFrame(faceRAF);
+}
+
+function faceMovePupils() {
+  if (!faceActive) return;
+  const face = document.getElementById('session-face');
+  if (!face) return;
+  const rect = face.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2;
+  const dx = Math.max(-6, Math.min(6, (faceMX - cx) * .08));
+  const dy = Math.max(-4, Math.min(4, (faceMY - cy) * .08));
+  ['sf-pl','sf-pr'].forEach(id => {
+    const p = document.getElementById(id);
+    if (p) p.style.transform = `translate(${dx}px,${dy}px)`;
+  });
+  faceRAF = requestAnimationFrame(faceMovePupils);
+}
+
+document.addEventListener('mousemove', e => { faceMX = e.clientX; faceMY = e.clientY; });
+
+function faceBlink(half=false) {
+  if (faceIsBlinking) return;
+  faceIsBlinking = true;
+  const h = half ? 5 : 10;
+  ['sf-ltl','sf-lbl','sf-ltr','sf-lbr'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.height = h+'px';
+  });
+  setTimeout(() => {
+    ['sf-ltl','sf-lbl','sf-ltr','sf-lbr'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.height = '0';
+    });
+    faceIsBlinking = false;
+  }, half ? 350 : 120);
+}
+
+function faceScheduleBlink() {
+  if (!faceActive) return;
+  faceBlinkTimer = setTimeout(() => {
+    const r = Math.random();
+    faceBlink(r > .7);
+    faceScheduleBlink();
+  }, 2000 + Math.random() * 4000);
+}
+
+function sessionFaceClick() {
+  faceBlink(true);
+}
+
 function openSession(daemonId) {
+  faceStop();
   sessionDaemon = daemonId;
   sessionHistory = [];
 
   const d = DAEMONS[daemonId];
-  const info = document.getElementById('session-info');
-  info.innerHTML = `
-    <div class="session-av" style="background:${d.bg};color:${d.cor};border:.5px solid ${d.cor.replace('.9','.3')}">${d.ini}</div>
-    <div><div class="session-name" style="color:${d.cor}">${d.nome}</div><div class="session-ess">${d.ess}</div></div>`;
+  const infoText = document.getElementById('session-info-text');
+  if (infoText) infoText.innerHTML = `<div class="session-name" style="color:${d.cor}">${d.nome}</div><div class="session-ess">${d.ess}</div>`;
+
+  // Inicializa rosto com a cor do daemon
+  setTimeout(() => faceInit(d.cor), 100);
 
   document.getElementById('session-chat').innerHTML = '<div class="session-empty" id="session-empty">' + d.nome + ' aguarda</div>';
   document.getElementById('tab-session').style.display = 'block';
@@ -1198,14 +1538,94 @@ const CREATE_QUESTIONS = [
   {text:'se alguém que te conhece bem te descrevesse em silêncio — o que faria?', sub:'última pergunta'},
 ];
 
+// ── ONBOARDING FACE ──
+let onbBlinkTimer = null;
+let onbIsBlinking = false;
+let onbMX = 0, onbMY = 0;
+let onbRAF = null;
+let onbFaceActive = false;
+
+function onbFaceStart() {
+  onbFaceActive = true;
+  onbMovePupils();
+  onbScheduleBlink();
+}
+function onbFaceStop() {
+  onbFaceActive = false;
+  clearTimeout(onbBlinkTimer);
+  if (onbRAF) cancelAnimationFrame(onbRAF);
+}
+function onbMovePupils() {
+  if (!onbFaceActive) return;
+  const face = document.getElementById('onb-face-wrap');
+  if (!face) { onbRAF = requestAnimationFrame(onbMovePupils); return; }
+  const rect = face.getBoundingClientRect();
+  const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+  const dx = Math.max(-8, Math.min(8, (onbMX-cx)*.1));
+  const dy = Math.max(-5, Math.min(5, (onbMY-cy)*.1));
+  ['onb-pl','onb-pr'].forEach(id => {
+    const p = document.getElementById(id);
+    if (p) p.style.transform = `translate(${dx}px,${dy}px)`;
+  });
+  onbRAF = requestAnimationFrame(onbMovePupils);
+}
+document.addEventListener('mousemove', e => { onbMX=e.clientX; onbMY=e.clientY; });
+
+function onbBlink(half=false) {
+  if (onbIsBlinking) return;
+  onbIsBlinking = true;
+  const h = half ? 12 : 24;
+  ['onb-ltl','onb-lbl','onb-ltr','onb-lbr'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.height = h+'px';
+  });
+  setTimeout(() => {
+    ['onb-ltl','onb-lbl','onb-ltr','onb-lbr'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.height = '0';
+    });
+    onbIsBlinking = false;
+  }, half ? 380 : 130);
+}
+function onbScheduleBlink() {
+  if (!onbFaceActive) return;
+  onbBlinkTimer = setTimeout(() => {
+    onbBlink(Math.random() > .65);
+    onbScheduleBlink();
+  }, 2200 + Math.random() * 3800);
+}
+
+function onbShowMessage(text, delay=0) {
+  const typing = document.getElementById('onb-typing');
+  const bubble = document.getElementById('onb-bubble');
+  if (!typing || !bubble) return;
+  setTimeout(() => {
+    typing.style.opacity = '1';
+    bubble.style.opacity = '0';
+    const dur = Math.min(1400, text.length * 40);
+    setTimeout(() => {
+      typing.style.opacity = '0';
+      bubble.textContent = text;
+      bubble.style.opacity = '1';
+      onbBlink(false);
+      // mostra input depois da primeira mensagem
+      const inputRow = document.getElementById('onb-input-row');
+      if (inputRow) {
+        inputRow.style.display = 'flex';
+        setTimeout(() => document.getElementById('create-input')?.focus(), 100);
+      }
+    }, dur);
+  }, delay);
+}
+
 function initCreate() {
   if (createStarted) return;
-  const input = document.getElementById('create-input');
-  input.style.display = 'block';
-  input.placeholder = 'pressione enter para começar';
-  setTimeout(() => input.focus(), 100);
-  // marca como iniciado só depois de exibir
   createStarted = true;
+  onbFaceStart();
+  // Primeira mensagem da presença
+  setTimeout(() => {
+    onbShowMessage('algo aqui percebeu sua chegada.', 400);
+  }, 200);
 }
 
 async function answerCreate() {
@@ -1213,11 +1633,10 @@ async function answerCreate() {
   const text = input.value.trim();
 
   if (createStep === -1) {
-    // Começa — não precisa de texto
     createStep = 0;
     input.value = '';
-    await setCreateText('bem vindo.', '');
-    await wait(800);
+    onbShowMessage('bem vindo. vamos começar.', 0);
+    await wait(1800);
     showCreateQuestion(0);
     return;
   }
@@ -1234,18 +1653,16 @@ async function answerCreate() {
     return;
   }
 
-  const reactions = ['interessante.','continua.','essa resposta importa.','mais perto.','última.'];
-  await setCreateText(reactions[createStep-1] || '...', '');
-  await wait(1000);
+  const reactions = ['interessante.','continua.','essa resposta importa.','mais perto.','última pergunta.'];
+  onbShowMessage(reactions[createStep-1] || '...');
+  await wait(1800);
   showCreateQuestion(createStep);
 }
 
 function showCreateQuestion(i) {
   const q = CREATE_QUESTIONS[i];
-  setCreateText(q.text, q.sub);
-  const inner = document.getElementById('create-inner');
-  inner.style.background = `rgba(255,255,255,${0.07 + i * 0.03})`;
-  document.getElementById('create-input').focus();
+  onbShowMessage(q.text, 0);
+  document.getElementById('create-input')?.focus();
 }
 
 async function setCreateText(text, sub) {
@@ -1257,7 +1674,8 @@ async function setCreateText(text, sub) {
 }
 
 async function generateNewDaemon() {
-  await setCreateText('analisando o que emergiu...', '');
+  onbShowMessage('analisando o que emergiu...');
+  document.getElementById('onb-input-row').style.display = 'none';
 
   const answersText = createAnswers.map((a,i) => `P${i+1}: ${a.q}\nR: ${a.a}`).join('\n\n');
 
@@ -1297,11 +1715,13 @@ Responda APENAS em JSON válido, sem markdown:
 }
 
 function showCreateResult(d) {
+  onbFaceStop();
   const safe = (id, fn) => { const el = document.getElementById(id); if (el) fn(el); };
-  safe('create-text',  el => el.style.display = 'none');
-  safe('create-sub',   el => el.style.display = 'none');
-  safe('create-orb',   el => el.style.display = 'none');
-  safe('create-input', el => el.style.display = 'none');
+  safe('onb-face-wrap',   el => el.style.display = 'none');
+  safe('onb-name',        el => el.style.display = 'none');
+  safe('onb-sub',         el => el.style.display = 'none');
+  safe('onb-bubble-wrap', el => el.style.display = 'none');
+  safe('onb-input-row',   el => el.style.display = 'none');
 
   const result = document.getElementById('create-result');
   result.style.display = 'flex';
@@ -1384,14 +1804,17 @@ async function invokeDaemon() {
 
 function resetCreate() {
   createStep = -1; createAnswers = []; newDaemon = null; createStarted = false;
+  onbFaceStop();
 
   const safe = (id, fn) => { const el = document.getElementById(id); if (el) fn(el); };
-
-  safe('create-text', el => { el.style.display = ''; el.textContent = 'responda 5 perguntas. seu daemon emerge do que você disser.'; });
-  safe('create-sub',  el => { el.style.display = ''; el.textContent = 'pressione enter para começar'; });
-  safe('create-orb',  el => { el.style.display = ''; });
-  safe('create-result', el => { el.style.display = 'none'; });
-  safe('create-input',  el => { el.value = ''; el.style.display = 'none'; });
+  safe('onb-face-wrap',   el => el.style.display = '');
+  safe('onb-name',        el => el.style.display = '');
+  safe('onb-sub',         el => el.style.display = '');
+  safe('onb-bubble-wrap', el => { el.style.display = ''; });
+  safe('onb-input-row',   el => el.style.display = 'none');
+  safe('onb-bubble',      el => { el.style.opacity = '0'; el.textContent = ''; });
+  safe('create-result',   el => el.style.display = 'none');
+  safe('create-input',    el => { el.value = ''; });
 
   initCreate();
 }
@@ -1461,6 +1884,240 @@ function simAbsence() {
 // ── NOTÍCIAS ──
 let currentNews = [];
 let newsTimer = null;
+
+// ── VILA 3D ──
+let vilaInit = false;
+let vilaRenderer, vilaScene, vilaCamera, vilaHotspots=[], vilaHovered=null, vilaT=0, vilaRAF=null;
+
+const VILA_LOCS = {
+  praca:  {name:'PRAÇA',      sub:'o coração da vila',   daemons:['callum','silas','matteo','lara','selin','darian','theo','nora'], env:'conversas ao vento · a fonte nunca para'},
+  casa:   {name:'SUA CASA',   sub:'seu refúgio',         daemons:['callum'], env:'luz aconchegante · memórias nas paredes'},
+  taverna:{name:'TAVERNA',    sub:'barulho bom',         daemons:['matteo','callum'], env:'madeira escura · aroma de especiarias'},
+  biblio: {name:'BIBLIOTECA', sub:'saber e silêncio',    daemons:['silas','darian'], env:'luz de manhã · prateleiras infinitas'},
+  sanctu: {name:'SANTUÁRIO',  sub:'contemplação',        daemons:['theo','selin'], env:'velas ao fundo · silêncio que pesa bem'},
+  jardim: {name:'JARDIM',     sub:'entre flores',        daemons:['lara','nora'], env:'terra molhada · borboletas de março'},
+};
+
+function initVila() {
+  if(vilaInit) return;
+  vilaInit = true;
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  script.onload = buildVila3D;
+  script.onerror = () => buildVila2D(); // fallback canvas 2D
+  document.head.appendChild(script);
+}
+
+function buildVila3D() {
+  const container = document.getElementById('view-vila');
+  const canvas = document.getElementById('vila-canvas');
+  const W = ()=> container.clientWidth;
+  const H = ()=> container.clientHeight;
+
+  vilaRenderer = new THREE.WebGLRenderer({canvas, antialias:true});
+  vilaRenderer.setSize(W(), H());
+  vilaRenderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  vilaRenderer.shadowMap.enabled = true;
+  vilaRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  vilaRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+  vilaRenderer.toneMappingExposure = 1.1;
+
+  vilaScene = new THREE.Scene();
+  vilaScene.background = new THREE.Color(0x0a1a0a);
+  vilaScene.fog = new THREE.FogExp2(0x0d1f0d, 0.025);
+
+  const asp = W()/H();
+  const fr = 9;
+  vilaCamera = new THREE.OrthographicCamera(-fr*asp,fr*asp,fr,-fr,0.1,100);
+  vilaCamera.position.set(14,14,14);
+  vilaCamera.lookAt(0,0,0);
+
+  // Luzes
+  vilaScene.add(new THREE.AmbientLight(0x1a2f1a, 0.7));
+  const sun = new THREE.DirectionalLight(0xfff4d0, 1.4);
+  sun.position.set(8,16,6); sun.castShadow=true;
+  sun.shadow.mapSize.set(1024,1024);
+  ['left','right','top','bottom'].forEach((s,i)=>sun.shadow.camera[s]=[-16,16,16,-16][i]);
+  sun.shadow.bias=-0.001; vilaScene.add(sun);
+  vilaScene.add(Object.assign(new THREE.DirectionalLight(0x2040a0,0.3),{position:{set:()=>{}}}) );
+  const fl = new THREE.DirectionalLight(0x2040a0,0.3); fl.position.set(-6,4,-4); vilaScene.add(fl);
+
+  const M=(c,r=.85,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+  const box=(w,h,d,mat,x,y,z)=>{const ms=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);ms.position.set(x,y,z);ms.castShadow=ms.receiveShadow=true;vilaScene.add(ms);return ms;};
+  const cyl=(rt,rb,h,s,mat,x,y,z)=>{const ms=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,s),mat);ms.position.set(x,y,z);ms.castShadow=ms.receiveShadow=true;vilaScene.add(ms);return ms;};
+  const cone=(r,h,s,mat,x,y,z,ry=0)=>{const ms=new THREE.Mesh(new THREE.ConeGeometry(r,h,s),mat);ms.position.set(x,y,z);ms.rotation.y=ry;ms.castShadow=ms.receiveShadow=true;vilaScene.add(ms);return ms;};
+  const lp=(c,i,d,x,y,z)=>{const l=new THREE.PointLight(c,i,d);l.position.set(x,y,z);vilaScene.add(l);};
+
+  // Chão
+  const gnd=new THREE.Mesh(new THREE.PlaneGeometry(22,22),M(0x1a3012,.95));
+  gnd.rotation.x=-Math.PI/2; gnd.receiveShadow=true; vilaScene.add(gnd);
+
+  // Caminhos
+  const pm=M(0x3a2e1e,.98);
+  [[-1.5,0,0],[1.5,0,0],[0,0,-1.5],[0,0,1.5],[0,0,0],[-1.5,0,-1.5],[-1.5,0,1.5],[1.5,0,-1.5],[1.5,0,1.5]].forEach(([x,,z])=>{
+    const p=new THREE.Mesh(new THREE.BoxGeometry(2.8,.06,2.8),pm);p.position.set(x,.03,z);p.receiveShadow=true;vilaScene.add(p);
+  });
+
+  // Água
+  const wm=M(0x1a4060,.1,.3); wm.transparent=true; wm.opacity=.85;
+  const w1=new THREE.Mesh(new THREE.PlaneGeometry(3,22),wm); w1.rotation.x=-Math.PI/2; w1.position.set(-8.5,.05,0); vilaScene.add(w1);
+  const w2=new THREE.Mesh(new THREE.PlaneGeometry(22,3),wm.clone()); w2.rotation.x=-Math.PI/2; w2.position.set(0,.05,-8.5); vilaScene.add(w2);
+
+  // SUA CASA
+  box(2.4,1.6,2.4,M(0x5a3828),-5,.8,-5);
+  cone(1.8,1.4,4,M(0x8a3020),-5,2.2,-5,Math.PI/4);
+  lp(0xffcc44,.6,2.5,-5,1,-4.2);
+  addVilaSpot(-5,-5,'casa');
+
+  // TAVERNA
+  box(2.8,2,2.8,M(0x5a3010),-3.5,1,-6);
+  cone(2,1.4,4,M(0x8a4820),-3.5,2.7,-6,Math.PI/4);
+  lp(0xff8822,.5,3,-3.5,2.5,-5);
+  addVilaSpot(-3.5,-6,'taverna');
+
+  // BIBLIOTECA
+  box(3,2.2,2.6,M(0x6a6040),4.5,1.1,-5.5);
+  box(3.4,.2,3,M(0x5a5030),4.5,2.32,-5.5);
+  cyl(.12,.12,2.2,8,M(0x7a7040),3.2,1.1,-4.2);
+  cyl(.12,.12,2.2,8,M(0x7a7040),5.8,1.1,-4.2);
+  lp(0xffe0a0,.4,3,4.5,1,-5.5);
+  addVilaSpot(4.5,-5.5,'biblio');
+
+  // SANTUÁRIO
+  box(2.4,2.6,3,M(0x8a8a9a),-5.5,1.3,3.5);
+  box(.7,4.5,.7,M(0x7a7a8a),-5.5,2.25,3.5);
+  box(.08,.6,.08,M(0xd0d0e0),-5.5,4.8,3.5);
+  box(.4,.08,.08,M(0xd0d0e0),-5.5,4.6,3.5);
+  lp(0xa0a0ff,.5,4,-5.5,1.5,3.5);
+  addVilaSpot(-5.5,3.5,'sanctu');
+
+  // JARDIM
+  const gp=new THREE.Mesh(new THREE.BoxGeometry(3.5,.1,3.5),M(0x1a5012));
+  gp.position.set(5,.05,5); gp.receiveShadow=true; vilaScene.add(gp);
+  [[0xff7070],[0xffcc44],[0xff90cc],[0x80ffcc]].forEach(([c],i)=>{
+    const a=i/4*Math.PI*2;
+    const fl=new THREE.Mesh(new THREE.SphereGeometry(.15,6,6),M(c,.7));
+    fl.position.set(5+Math.cos(a)*.9,.3,5+Math.sin(a)*.9); fl.castShadow=true; vilaScene.add(fl);
+  });
+  addVilaSpot(5,5,'jardim');
+
+  // PRAÇA CENTRAL
+  const pfm=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,.15,12),M(0x4a4030));
+  pfm.position.set(0,.15,0); pfm.receiveShadow=true; vilaScene.add(pfm);
+  cyl(.5,.6,.4,12,M(0x5a5a6a),0,.4,0);
+  cyl(.15,.15,.8,8,M(0x6a6a7a),0,.7,0);
+  [[1.4,1.4],[1.4,-1.4],[-1.4,1.4],[-1.4,-1.4]].forEach(([x,z])=>{
+    cyl(.04,.04,1.4,6,M(0x3a2a10),x,.7,z);
+    lp(0xffdd66,.8,3.5,x,1.5,z);
+  });
+  addVilaSpot(0,0,'praca');
+
+  // ÁRVORES
+  function makeTree(x,z,s=1){
+    cyl(.06*s,.09*s,1.2*s,6,M(0x3a2010),x,.6*s,z);
+    cyl(.5*s,.7*s,.7*s,8,M(0x1a5010),x,1.1*s,z);
+    cyl(.4*s,.55*s,.65*s,8,M(0x226015),x,1.6*s,z);
+    cone(.22*s,.5*s,6,M(0x3a9020),x,2.5*s,z);
+  }
+  [[-7,-7],[-7,7],[7,-7],[7,7],[-4,-8],[-8,-3],[-8,3],[-4,8],[4,-8],[4,8],[8,-3],[8,3]].forEach(([x,z],i)=>makeTree(x,z,.8+i%3*.15));
+
+  // Rings
+  vilaHotspots.forEach(h=>{
+    const g=new THREE.RingGeometry(.3,.48,16);
+    const mat=new THREE.MeshBasicMaterial({color:0x60dd30,side:THREE.DoubleSide,transparent:true,opacity:.7});
+    const ring=new THREE.Mesh(g,mat); ring.rotation.x=-Math.PI/2;
+    ring.position.set(h.x,.2,h.z); vilaScene.add(ring);
+    h.ring=ring; h.ringMat=mat;
+  });
+
+  // Mouse
+  canvas.addEventListener('mousemove', e=>{
+    const r=canvas.getBoundingClientRect();
+    const mx=(e.clientX-r.left)/r.width*2-1;
+    const my=-((e.clientY-r.top)/r.height)*2+1;
+    let found=null;
+    vilaHotspots.forEach(h=>{
+      const v=new THREE.Vector3(h.x,.5,h.z).project(vilaCamera);
+      if(Math.hypot(v.x-mx,v.y-my)<.09) found=h;
+    });
+    vilaHovered=found;
+    const tip=document.getElementById('vila-tip');
+    if(found){
+      const loc=VILA_LOCS[found.key];
+      document.getElementById('vila-tip-name').textContent=loc.name;
+      document.getElementById('vila-tip-d').textContent=(loc.daemons||[]).map(id=>DAEMONS[id]?.nome||id).join(' · ');
+      tip.style.display='block';
+      tip.style.left=Math.min(e.clientX-r.left+14,r.width-180)+'px';
+      tip.style.top=Math.max(e.clientY-r.top-60,8)+'px';
+      canvas.style.cursor='pointer';
+    } else { tip.style.display='none'; canvas.style.cursor='default'; }
+  });
+  canvas.addEventListener('click',()=>{ if(vilaHovered) vilaOpenLoc(vilaHovered.key); });
+
+  document.getElementById('vila-load').style.display='none';
+
+  // Animate
+  function animate(){
+    vilaRAF=requestAnimationFrame(animate);
+    vilaT+=.016;
+    vilaHotspots.forEach((h,i)=>{
+      const s=1+Math.sin(vilaT*2+i)*.15;
+      h.ring.scale.set(s,1,s);
+      h.ringMat.opacity=vilaHovered===h?.95:.5+Math.sin(vilaT*1.5+i)*.25;
+      h.ringMat.color.setHSL(.3,.8,vilaHovered===h?.65:.45);
+      h.ring.position.y=.2+Math.sin(vilaT+i)*.06;
+    });
+    vilaRenderer.render(vilaScene,vilaCamera);
+  }
+  animate();
+}
+
+function addVilaSpot(x,z,key){ vilaHotspots.push({x,z,key}); }
+
+function buildVila2D() {
+  // Fallback: canvas 2D simples se Three.js não carregar
+  document.getElementById('vila-load').style.display='none';
+  const canvas=document.getElementById('vila-canvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth; canvas.height=canvas.offsetHeight;
+  ctx.fillStyle='#0a1a0a'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='rgba(100,200,80,.7)'; ctx.font='14px monospace'; ctx.textAlign='center';
+  ctx.fillText('VILA 2D — CLIQUE NOS LOCAIS',canvas.width/2,canvas.height/2-20);
+  ctx.fillStyle='rgba(255,255,255,.3)'; ctx.font='11px monospace';
+  ctx.fillText('praça · taverna · jardim · biblioteca · santuário · sua casa',canvas.width/2,canvas.height/2+10);
+}
+
+function vilaOpenLoc(key){
+  const ov=document.getElementById('vila-ov');
+  ov.style.opacity='1'; ov.style.pointerEvents='all';
+  setTimeout(()=>{ vilaShowPanel(key); ov.style.opacity='0'; ov.style.pointerEvents='none'; },380);
+}
+
+function vilaShowPanel(key){
+  const loc=VILA_LOCS[key];
+  document.getElementById('vila-pt').textContent=loc.name;
+  document.getElementById('vila-ps').textContent=loc.sub;
+  document.getElementById('vila-pd').textContent=loc.daemons.map(id=>DAEMONS[id]?.nome||id).join(' · ');
+  document.getElementById('vila-pe').textContent=loc.env;
+  const pf=document.getElementById('vila-pf'); pf.innerHTML='';
+  loc.daemons.forEach(id=>{
+    const d=DAEMONS[id]; if(!d) return;
+    const card=document.createElement('div');
+    card.className='d-card'; card.style.cssText='flex-direction:column;align-items:center;padding:12px;gap:8px;cursor:pointer;min-width:80px';
+    card.innerHTML=`<div class="d-av" style="width:44px;height:44px;background:${d.bg};color:${d.cor};font-size:18px">${d.ini}</div>
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${d.cor}">${d.nome}</div>
+      <div style="font-size:9px;color:var(--hint);text-align:center">${d.ess}</div>`;
+    card.onclick=()=>{ vilaBack(); openSession(id); };
+    pf.appendChild(card);
+  });
+  document.getElementById('vila-pan').style.display='flex';
+}
+
+function vilaBack(){
+  const ov=document.getElementById('vila-ov');
+  ov.style.opacity='1'; ov.style.pointerEvents='all';
+  setTimeout(()=>{ document.getElementById('vila-pan').style.display='none'; ov.style.opacity='0'; ov.style.pointerEvents='none'; },320);
+}
 
 async function loadState() {
   try {
@@ -1568,12 +2225,119 @@ function getNewsContext() {
 // ── INIT ──
 function wait(ms){return new Promise(r=>setTimeout(r,ms));}
 
-buildSidebar();
-buildPlazaControls();
-setTab('plaza');
-fetchNews();
-initPlazaScroll();
-loadState(); // carrega daemons customizados + histórico da praça
+// ── WAKE SCREEN ──
+let authMode = 'login';
+
+// Stars para wake screen
+(function(){
+  const c = document.getElementById('wake-stars');
+  function draw(){
+    c.width=window.innerWidth; c.height=window.innerHeight;
+    const ctx=c.getContext('2d');
+    for(let i=0;i<200;i++){
+      ctx.beginPath();
+      ctx.arc(Math.random()*c.width,Math.random()*c.height,Math.random()*.8,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${Math.random()*.3+.02})`;
+      ctx.fill();
+    }
+  }
+  draw(); window.addEventListener('resize',draw);
+})();
+
+document.getElementById('wake-screen').onclick = function(e) {
+  const card = document.getElementById('login-card');
+  if (card.style.display !== 'none') return; // já aberto
+  document.getElementById('wake-content').style.animation = 'none';
+  document.getElementById('wake-content').style.opacity = '0';
+  setTimeout(() => {
+    document.getElementById('wake-content').style.display = 'none';
+    card.style.display = 'flex';
+    document.getElementById('auth-email').focus();
+  }, 300);
+};
+
+function switchAuth(mode) {
+  authMode = mode;
+  document.querySelectorAll('.ltab').forEach((t,i) => t.classList.toggle('active', (i===0&&mode==='login')||(i===1&&mode==='signup')));
+  document.getElementById('signup-name-wrap').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('auth-btn-text').textContent = mode === 'login' ? 'entrar' : 'criar conta';
+  document.getElementById('auth-error').textContent = '';
+}
+
+async function submitAuth() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass = document.getElementById('auth-pass').value;
+  const name = document.getElementById('auth-name')?.value.trim() || '';
+  const errEl = document.getElementById('auth-error');
+  const btn = document.getElementById('auth-btn');
+  const loading = document.getElementById('auth-loading');
+  const btnText = document.getElementById('auth-btn-text');
+
+  if (!email || !pass) { errEl.textContent = 'preencha email e senha'; return; }
+  if (authMode === 'signup' && !name) { errEl.textContent = 'como você se chama?'; return; }
+  if (pass.length < 4) { errEl.textContent = 'senha muito curta'; return; }
+
+  btn.disabled = true;
+  btnText.style.display = 'none';
+  loading.style.display = 'inline';
+
+  try {
+    const r = await fetch('/auth/' + authMode, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass, name})
+    });
+    const d = await r.json();
+
+    if (d.error) {
+      errEl.textContent = d.error;
+      btn.disabled = false;
+      btnText.style.display = 'inline';
+      loading.style.display = 'none';
+      return;
+    }
+
+    // Sucesso — guarda user e fecha wake screen
+    window._user = d.user;
+    document.getElementById('wake-screen').style.transition = 'opacity .5s';
+    document.getElementById('wake-screen').style.opacity = '0';
+    setTimeout(() => {
+      document.getElementById('wake-screen').style.display = 'none';
+      initAnima();
+    }, 500);
+
+  } catch(e) {
+    errEl.textContent = 'erro de conexão';
+    btn.disabled = false;
+    btnText.style.display = 'inline';
+    loading.style.display = 'none';
+  }
+}
+
+function initAnima() {
+  buildSidebar();
+  buildPlazaControls();
+  setTab('plaza');
+  fetchNews();
+  initPlazaScroll();
+  loadState();
+}
+
+// Verifica se já tem sessão ativa
+(async function checkSession() {
+  try {
+    const r = await fetch('/auth/session');
+    const d = await r.json();
+    if (d.user) {
+      window._user = d.user;
+      document.getElementById('wake-screen').style.display = 'none';
+      initAnima();
+    }
+    // se não tem sessão, fica na wake screen
+  } catch(e) {
+    // sem sessão, wake screen normal
+  }
+})();
 </script>
 </body>
 </html>"""
@@ -1581,14 +2345,58 @@ loadState(); // carrega daemons customizados + histórico da praça
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *args): pass
 
-    def load_memory(self):
-        p = Path(__file__).parent / 'plaza_memory.json'
+    # ── AUTH ──
+    def _data(self):
+        return Path('/data') if Path('/data').exists() else Path(__file__).parent
+
+    def load_users(self):
+        p = self._data() / 'users.json'
+        return json.loads(p.read_text(encoding='utf-8')) if p.exists() else {}
+
+    def save_users(self, users):
+        p = self._data() / 'users.json'
+        p.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding='utf-8')
+
+    def load_sessions(self):
+        p = self._data() / 'sessions.json'
+        return json.loads(p.read_text(encoding='utf-8')) if p.exists() else {}
+
+    def save_sessions(self, sessions):
+        p = self._data() / 'sessions.json'
+        p.write_text(json.dumps(sessions, ensure_ascii=False), encoding='utf-8')
+
+    def hash_pass(self, password):
+        return hashlib.sha256(password.encode()).hexdigest()
+
+    def get_session_user(self):
+        """Retorna user_id da sessão atual via cookie."""
+        cookie = self.headers.get('Cookie', '')
+        token = None
+        for part in cookie.split(';'):
+            part = part.strip()
+            if part.startswith('anima_session='):
+                token = part[len('anima_session='):]
+                break
+        if not token: return None
+        sessions = self.load_sessions()
+        session = sessions.get(token)
+        if not session: return None
+        # expira após 30 dias
+        if time.time() - session.get('created', 0) > 30 * 86400:
+            return None
+        return session.get('user_id')
+
+    def load_memory(self, user_id=None):
+        # Memória da praça é compartilhada; memória do usuário é privada
+        fname = f'memory_{user_id}.json' if user_id else 'plaza_memory.json'
+        p = self._data() / fname
         if p.exists():
             return json.loads(p.read_text(encoding='utf-8'))
         return {"usuario": {}, "fatos_plaza": [], "historico": [], "sessoes": 0}
 
-    def save_memory(self, mem):
-        p = Path(__file__).parent / 'plaza_memory.json'
+    def save_memory(self, mem, user_id=None):
+        fname = f'memory_{user_id}.json' if user_id else 'plaza_memory.json'
+        p = self._data() / fname
         p.write_text(json.dumps(mem, ensure_ascii=False, indent=2), encoding='utf-8')
 
     def load_daemons(self):
@@ -1667,6 +2475,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/news':
             news = self.fetch_news()
             self._json({'news': news})
+        elif self.path == '/auth/session':
+            user_id = self.get_session_user()
+            if user_id:
+                users = self.load_users()
+                u = users.get(user_id, {})
+                self._json({'user': {'id': user_id, 'name': u.get('name',''), 'email': u.get('email','')}})
+            else:
+                self._json({'user': None})
         elif self.path == '/state':
             # Retorna estado completo: daemons customizados + histórico da praça + usuário
             mem = self.load_memory()
@@ -1717,6 +2533,58 @@ class Handler(http.server.BaseHTTPRequestHandler):
             mem.setdefault('usuario', {})[body.get('key','')] = body.get('value','')
             self.save_memory(mem)
             self._json({'ok': True})
+        elif self.path == '/auth/login':
+            email = body.get('email','').strip().lower()
+            password = body.get('password','')
+            users = self.load_users()
+            # Encontra user por email
+            user_id = None
+            user = None
+            for uid, u in users.items():
+                if u.get('email','').lower() == email:
+                    user_id = uid; user = u; break
+            if not user:
+                self._json({'error': 'email não encontrado'}); return
+            if user.get('password') != self.hash_pass(password):
+                self._json({'error': 'senha incorreta'}); return
+            # Cria sessão
+            token = secrets.token_urlsafe(32)
+            sessions = self.load_sessions()
+            sessions[token] = {'user_id': user_id, 'created': time.time()}
+            self.save_sessions(sessions)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Set-Cookie', f'anima_session={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000')
+            self.end_headers()
+            self.wfile.write(json.dumps({'user': {'id': user_id, 'name': user.get('name',''), 'email': email}}).encode())
+            return
+
+        elif self.path == '/auth/signup':
+            email = body.get('email','').strip().lower()
+            password = body.get('password','')
+            name = body.get('name','').strip()
+            if not email or not password or not name:
+                self._json({'error': 'preencha todos os campos'}); return
+            users = self.load_users()
+            # Verifica se email já existe
+            for u in users.values():
+                if u.get('email','').lower() == email:
+                    self._json({'error': 'email já cadastrado'}); return
+            user_id = secrets.token_urlsafe(12)
+            users[user_id] = {'email': email, 'password': self.hash_pass(password), 'name': name, 'created': time.time()}
+            self.save_users(users)
+            # Cria sessão
+            token = secrets.token_urlsafe(32)
+            sessions = self.load_sessions()
+            sessions[token] = {'user_id': user_id, 'created': time.time()}
+            self.save_sessions(sessions)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Set-Cookie', f'anima_session={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000')
+            self.end_headers()
+            self.wfile.write(json.dumps({'user': {'id': user_id, 'name': name, 'email': email}}).encode())
+            return
+
         elif self.path == '/daemon/register':
             self.save_daemon(body.get('id',''), body.get('daemon', {}))
             self._json({'ok': True})
