@@ -889,18 +889,25 @@ function startRename(id, e) {
 
 // ── TABS ──
 function setTab(t) {
-  ['plaza','session','create','absence'].forEach(v => {
-    document.getElementById('view-'+v).style.display = v===t?'flex':'none';
+  // Esconde todas as views incluindo vila
+  ['plaza','session','create','absence','vila'].forEach(v => {
+    const el = document.getElementById('view-'+v);
+    if (el) el.style.display = 'none';
   });
+  // Mostra a view correta
+  const target = document.getElementById('view-'+t);
+  if (target) target.style.display = 'flex';
+
+  // Atualiza tabs ativas
   document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-  // índices: 0=praça, 1=sessão(hidden), 2=criar, 3=ausência
-  const tabIdx = {plaza:0, session:1, create:2, absence:3};
+  const tabMap = {vila:0, plaza:1, session:2, create:3, absence:4};
   const tabs = document.querySelectorAll('.tab');
-  if (tabs[tabIdx[t]]) tabs[tabIdx[t]].classList.add('active');
+  if (tabs[tabMap[t]]) tabs[tabMap[t]].classList.add('active');
 
   if (t==='create') initCreate();
   if (t==='absence') simAbsence();
   if (t==='plaza') buildPlazaControls();
+  if (t==='vila') initVila();
 }
 
 // ── PRAÇA ──
