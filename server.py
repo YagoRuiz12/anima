@@ -63,7 +63,8 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 .d-card.in-plaza{border-left:3px solid}
 .d-av{width:40px;height:40px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:16px}
 .d-info{flex:1;min-width:0}
-.d-name{font-size:13px;letter-spacing:.5px;text-transform:uppercase;font-weight:400}
+.d-name{font-size:13px;letter-spacing:.5px;text-transform:uppercase;font-weight:400;cursor:text}
+.d-name-input{font-size:13px;letter-spacing:.5px;text-transform:uppercase;font-weight:400;background:transparent;border:none;border-bottom:.5px solid var(--rim2);color:var(--text);outline:none;width:100%;font-family:'DM Mono',monospace}
 .d-ess{font-size:11px;color:var(--hint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .d-badge{font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.07);color:var(--muted);flex-shrink:0}
 
@@ -398,13 +399,61 @@ function buildSidebar() {
     card.innerHTML = `
       <div class="d-av" style="background:${d.bg};color:${d.cor};border-color:${d.cor.replace('.9','.3')}">${d.ini}</div>
       <div class="d-info">
-        <div class="d-name" style="color:${d.cor}">${d.nome}</div>
+        <div class="d-name" id="dname-${id}" style="color:${d.cor}" ondblclick="startRename('${id}', event)">${d.nome}</div>
         <div class="d-ess">${d.ess}</div>
       </div>
       ${inPlaza ? '<div class="d-badge">praça</div>' : ''}`;
-    card.onclick = () => openSession(id);
+    card.onclick = (e) => { if (!e.target.closest('.d-name-input')) openSession(id); };
     list.appendChild(card);
   });
+}
+
+// ── RENOMEAR DAEMON ──
+function startRename(id, e) {
+  e.stopPropagation();
+  const el = document.getElementById('dname-' + id);
+  if (!el || el.querySelector('input')) return;
+
+  const currentName = DAEMONS[id].nome;
+  const cor = DAEMONS[id].cor;
+  el.innerHTML = '';
+
+  const input = document.createElement('input');
+  input.className = 'd-name-input';
+  input.style.color = cor;
+  input.value = currentName;
+  input.maxLength = 20;
+  el.appendChild(input);
+  input.focus();
+  input.select();
+
+  const save = async () => {
+    const newName = input.value.trim();
+    if (!newName || newName === currentName) {
+      el.innerHTML = `<span style="color:${cor}" ondblclick="startRename('${id}', event)">${currentName}</span>`;
+      return;
+    }
+    DAEMONS[id].nome = newName;
+    // Se for inicial, atualiza
+    if (newName.length > 0) DAEMONS[id].ini = newName[0].toUpperCase();
+
+    // Persiste no servidor
+    await fetch('/daemon/rename', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id, nome: newName})
+    });
+
+    el.innerHTML = `<span style="color:${cor}" ondblclick="startRename('${id}', event)">${newName}</span>`;
+    buildSidebar();
+    buildPlazaControls();
+  };
+
+  input.onblur = save;
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = currentName; input.blur(); }
+  };
 }
 
 // ── TABS ──
@@ -1351,9 +1400,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
         data[id] = daemon
         p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
 
+    def load_name_overrides(self):
+        _data_dir = Path('/data') if Path('/data').exists() else Path(__file__).parent
+        p = _data_dir / 'name_overrides.json'
+        return json.loads(p.read_text(encoding='utf-8')) if p.exists() else {}
+
+    def save_name_overrides(self, overrides):
+        _data_dir = Path('/data') if Path('/data').exists() else Path(__file__).parent
+        p = _data_dir / 'name_overrides.json'
+        p.write_text(json.dumps(overrides, ensure_ascii=False, indent=2), encoding='utf-8')
+
     def get_system_prompt(self, daemon_id):
         """Monta o system prompt para um daemon."""
         SOCIAL_BASE = "Você está numa conversa em grupo no mundo Anima. Fale como alguém numa conversa real — sem asteriscos, sem descrever gestos ou movimentos, só palavras faladas. Nunca seja confrontador ou agressivo. Máximo 2 frases."
+
+        # Verifica se tem nome customizado
+        overrides = self.load_name_overrides()
+        display_name = overrides.get(daemon_id, None)
 
         VOICES = {
             "callum": "Você é Callum. Próximo e direto — como um amigo que entende o ritmo de quem está conversando. Na leveza você é leve, no sério você acompanha. Você conecta o usuário aos outros daemons quando faz sentido.",
@@ -1428,6 +1491,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json({'ok': True})
         elif self.path == '/daemon/register':
             self.save_daemon(body.get('id',''), body.get('daemon', {}))
+            self._json({'ok': True})
+        elif self.path == '/daemon/rename':
+            daemon_id = body.get('id','')
+            new_name = body.get('nome','').strip()
+            if daemon_id and new_name:
+                # Atualiza nome no VOICES se for daemon customizado
+                custom = self.load_daemons()
+                if daemon_id in custom:
+                    custom[daemon_id]['nome'] = new_name
+                    self.save_daemon(daemon_id, custom[daemon_id])
+                # Para daemons base, salva override de nome
+                else:
+                    overrides = self.load_name_overrides()
+                    overrides[daemon_id] = new_name
+                    self.save_name_overrides(overrides)
             self._json({'ok': True})
         else:
             self.send_response(404)
