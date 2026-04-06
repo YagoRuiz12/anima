@@ -1369,6 +1369,93 @@ function simAbsence() {
 let currentNews = [];
 let newsTimer = null;
 
+async function loadState() {
+  try {
+    const r = await fetch('/state');
+    const d = await r.json();
+
+    // Carrega daemons customizados
+    const custom = d.custom_daemons || {};
+    const overrides = d.name_overrides || {};
+
+    Object.entries(custom).forEach(([id, daemon]) => {
+      if (!DAEMONS[id]) {
+        DAEMONS[id] = {
+          nome: daemon.nome || daemon.name || id,
+          ess:  daemon.essencia || daemon.ess || '',
+          cor:  daemon.cor || 'rgba(200,200,200,.9)',
+          bg:   daemon.bg || 'rgba(40,40,40,.9)',
+          ini:  daemon.inicial || daemon.ini || id[0].toUpperCase(),
+          threshold: 15
+        };
+      }
+    });
+
+    // Aplica overrides de nome
+    Object.entries(overrides).forEach(([id, override]) => {
+      if (DAEMONS[id]) {
+        const nome = typeof override === 'string' ? override : override.nome;
+        const ini  = typeof override === 'string' ? nome[0].toUpperCase() : (override.ini || nome[0].toUpperCase());
+        DAEMONS[id].nome = nome;
+        DAEMONS[id].ini  = ini;
+      }
+    });
+
+    // Reconstrói sidebar e praça com os daemons carregados
+    buildSidebar();
+    buildPlazaControls();
+
+    // Carrega histórico da praça
+    const historico = d.historico || [];
+    if (historico.length > 0) {
+      document.getElementById('plaza-empty')?.remove();
+      historico.forEach(m => {
+        const isYou = m.who === 'você';
+        // Encontra o id do daemon pelo nome
+        const daemonId = isYou ? null : Object.keys(DAEMONS).find(id => DAEMONS[id].nome === m.who);
+        if (isYou || daemonId) {
+          plazaHistory.push({who: m.who, text: m.text});
+          renderHistoryMsg(daemonId, m.who, m.text, isYou, m.ts);
+        }
+      });
+      // Scrolla para o fim após carregar
+      const plaza = document.getElementById('plaza');
+      plaza.scrollTop = plaza.scrollHeight;
+    }
+
+  } catch(e) {
+    console.log('Estado não carregado:', e);
+  }
+}
+
+function renderHistoryMsg(daemonId, who, text, isYou, ts) {
+  const plaza = document.getElementById('plaza');
+  const d = daemonId ? DAEMONS[daemonId] : null;
+  const row = document.createElement('div');
+  row.className = 'msg' + (isYou ? ' you' : '');
+  const displayTs = ts || '';
+
+  if (isYou) {
+    row.innerHTML = `
+      <div class="msg-body">
+        <div class="msg-who" style="color:var(--muted);text-align:right">você</div>
+        <div class="msg-text">${text}</div>
+        <div class="msg-ts" style="text-align:right">${displayTs}</div>
+      </div>`;
+  } else if (d) {
+    row.innerHTML = `
+      <div class="av" style="background:${d.bg};color:${d.cor};border-color:${d.cor.replace('.9','.3')}">${d.ini}</div>
+      <div class="msg-body">
+        <div class="msg-who" style="color:${d.cor}">${d.nome}</div>
+        <div class="msg-text">${text}</div>
+        <div class="msg-ts">${displayTs}</div>
+      </div>
+      <div class="reply-btn" onclick='setReply(${JSON.stringify({who: d.nome, text: text.slice(0,80)})})'>↩ responder</div>`;
+  } else return; // daemon não encontrado, pula
+
+  plaza.appendChild(row);
+}
+
 async function fetchNews() {
   try {
     const r = await fetch('/news');
@@ -1393,6 +1480,7 @@ buildPlazaControls();
 setTab('plaza');
 fetchNews();
 initPlazaScroll();
+loadState(); // carrega daemons customizados + histórico da praça
 </script>
 </body>
 </html>"""
@@ -1486,6 +1574,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/news':
             news = self.fetch_news()
             self._json({'news': news})
+        elif self.path == '/state':
+            # Retorna estado completo: daemons customizados + histórico da praça + usuário
+            mem = self.load_memory()
+            custom = self.load_daemons()
+            overrides = self.load_name_overrides()
+            # Histórico recente para exibir (últimas 30 mensagens)
+            historico = mem.get('historico', [])[-30:]
+            self._json({
+                'custom_daemons': custom,
+                'name_overrides': overrides,
+                'historico': historico,
+                'usuario': mem.get('usuario', {})
+            })
         elif self.path == '/memory/context':
             mem = self.load_memory()
             parts = []
