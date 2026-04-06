@@ -29,7 +29,7 @@ HTML = r"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ANIMA</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
 <style>
@@ -185,6 +185,99 @@ canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
 .tl-label{font-size:9px;color:var(--muted);margin-bottom:2px}
 .tl-desc{font-family:'Cormorant Garamond',serif;font-size:12px;font-style:italic;color:rgba(255,255,255,.55);line-height:1.5}
 .lib-msg{font-family:'Cormorant Garamond',serif;font-size:16px;font-style:italic;color:rgba(255,255,255,.65);text-align:center;padding:12px;border:.5px solid var(--rim);border-radius:8px;margin-top:12px;display:none;animation:fi .5s ease}
+
+/* ── MOBILE ── */
+@media (max-width: 768px) {
+  .main{grid-template-columns:1fr;height:calc(100vh - 56px)}
+
+  /* sidebar vira barra inferior */
+  .sidebar{
+    position:fixed;bottom:0;left:0;right:0;z-index:50;
+    flex-direction:column;height:auto;
+    border-right:none;border-top:.5px solid var(--rim2);
+    background:var(--void);
+  }
+  .sidebar-section{display:none}
+  .daemon-list{
+    flex-direction:row;overflow-x:auto;overflow-y:hidden;
+    padding:8px 12px;gap:10px;flex:none;
+    scrollbar-width:none;-ms-overflow-style:none;
+    border-bottom:none;
+  }
+  .daemon-list::-webkit-scrollbar{display:none}
+  .d-card{
+    flex-direction:column;align-items:center;
+    padding:8px 10px;min-width:60px;border-radius:12px;
+    gap:4px;text-align:center;
+  }
+  .d-av{width:36px;height:36px;font-size:15px}
+  .d-info{display:none}
+  .d-badge{display:none}
+  .d-card .d-av{display:flex}
+  /* mostra só inicial + ponto se estiver na praça */
+  .d-card.in-plaza::after{
+    content:'';width:6px;height:6px;border-radius:50%;
+    background:rgba(100,200,160,.8);display:block;margin:0 auto;
+  }
+  .sidebar > div:last-child{display:none} /* esconde "+ criar daemon" da sidebar */
+
+  /* área principal ocupa tudo */
+  .area{height:calc(100vh - 56px - 68px)}
+
+  /* tabs menores */
+  .tabs{padding:0 8px;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{font-size:9px;padding:10px 10px;white-space:nowrap}
+
+  /* praça */
+  .plaza{padding:12px 14px}
+  .msg-text{font-size:17px}
+  .msg.you .msg-text{font-size:16px}
+  .av{width:34px;height:34px;font-size:14px}
+  .msg{gap:10px;padding:12px 0}
+
+  /* input da praça */
+  .plaza-input-wrap{padding:10px 12px;gap:8px}
+  #plaza-input{font-size:16px;padding:10px 14px}
+  .btn-send{padding:10px 14px;font-size:10px}
+
+  /* sessão */
+  .session-chat{padding:12px 14px}
+  .session-daemon-info{padding:12px 14px}
+  .session-input-wrap{padding:10px 12px;gap:8px}
+  #session-input{font-size:16px;padding:10px 14px}
+
+  /* scroll btn */
+  .scroll-btn{bottom:130px;right:12px}
+
+  /* controles da praça */
+  .plaza-controls{padding:8px 12px;gap:6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .plaza-controls::-webkit-scrollbar{display:none}
+  .pc-label{display:none}
+  .pc-btn{font-size:9px;padding:4px 8px;white-space:nowrap}
+  .btn-flow{font-size:9px;padding:4px 10px}
+
+  /* criar daemon */
+  .create-wrap{padding:24px 20px}
+  .create-text{font-size:18px}
+  .create-input{font-size:16px}
+
+  /* ausência */
+  .absence-grid{grid-template-columns:1fr}
+  .absence-wrap{padding:12px 14px}
+
+  /* mention popup */
+  .mention-popup{left:8px !important;right:8px;width:auto}
+
+  /* reply banner */
+  #reply-banner{padding:6px 12px 0}
+
+  /* header */
+  .hdr{padding:12px 16px 10px}
+  .logo{font-size:20px;letter-spacing:4px}
+  .sub{font-size:9px}
+  .status{font-size:10px}
+}
 
 /* CONTROLES DA PRAÇA */
 .plaza-controls{padding:10px 20px;border-bottom:.5px solid var(--rim);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
