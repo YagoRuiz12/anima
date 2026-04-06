@@ -2699,6 +2699,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/news':
             news = self.fetch_news()
             self._json({'news': news})
+        elif self.path == '/three.js':
+            p = Path(__file__).parent / 'three.min.js'
+            if p.exists():
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/javascript')
+                self.send_header('Cache-Control', 'public, max-age=86400')
+                self.end_headers()
+                self.wfile.write(p.read_bytes())
+            else:
+                self._json({'error': 'not found'}, 404)
+            return
         elif self.path == '/auth/session':
             user_id = self.get_session_user()
             if user_id:
